@@ -15,6 +15,7 @@ REMOVE_DIR=
 REPLACE_DIR=
 IS_IPA=false
 IS_DEBUG=true
+PROVISION_PROFILE=
 
 # iOS user params
 CERT=
@@ -25,9 +26,10 @@ APPNAME=
 PAYLOAD_DIR="Payload"
 CODESIGN_DIR="_CodeSignature"
 ENTITLEMENTS="archived-expanded-entitlements.xcent"
+EMBEDDED_PROVISION="embedded.mobileprovision"
 
 # OS options
-IS_GARBAGE_COLLECTED=true
+IS_PAYLOAD_REUSED=false
 WORK_DIR=
 
 # Script presets
@@ -35,13 +37,14 @@ SUFFIX="hotwired"
 
 function usage {
 	printf "Usage: %s [-f <ipa file>] [-d <delete app dir>] [-p <copy dir>]\n" $0
-	printf "	-f <path>		path to *.ipa file\n"
-	printf "	-c <string>		valid certificate identity\n"
+	printf "	-f <path>		path to *.ipa archive\n"
 	printf "	-d <dir>		dir to delete inside app\n"
 	printf "	-p <dir>		dir to copy in place\n"
-	printf "	-i			install as ipa - faster install time for app's with many files\n"
+	printf "	-c <string>		valid certificate code sign identity\n"
+	printf "	-m <path>		path to *.mobileprovision profile\n"
+	printf "	-i			install as *.ipa (faster install time for an app with many files)\n"
 	printf "	-q			no debugging\n"
-	printf "	-z			don't replace $PAYLOAD_DIR dir each time\n"
+	printf "	-z			reuse unzipped $PAYLOAD_DIR dir\n"
 	printf "Example: sh hotwire-ipa.sh -f ~/Desktop/App.ipa -c \"iPhone Developer: Your Name (XXXXXXXXXX)\" -d \"www\" -p ~/Sites/www\n"
 	exit 1
 }
@@ -52,22 +55,23 @@ fi
 
 START_TIME=$(date +"%s")
 
-while getopts "f:c:d:p:iqz" opt; do
-    case "$opt" in
-    f)	FILE=$OPTARG;;
-    c)	CERT=$OPTARG;;
-	d)	REMOVE_DIR=$OPTARG;;
-	p)	REPLACE_DIR=$OPTARG;;
-	i)	IS_IPA=true;;
-	q)	IS_DEBUG=false;;
-	z)	IS_GARBAGE_COLLECTED=false;;
-    ?)	
-		usage
-		exit 1;;
-	:)
-		printf "Option -$OPTARG requires an argument."
-		exit 1;;
-    esac
+while getopts "f:d:p:c:m:iqz" opt; do
+	case "$opt" in
+		f)	FILE=$OPTARG;;
+    d)	REMOVE_DIR=$OPTARG;;
+    p)	REPLACE_DIR=$OPTARG;;
+		c)	CERT=$OPTARG;;
+		m)	PROVISION_PROFILE=$OPTARG;;
+    i)	IS_IPA=true;;
+    q)	IS_DEBUG=false;;
+    z)	IS_PAYLOAD_REUSED=true;;
+    ?)
+			usage
+			exit 1;;
+		:)
+			printf "Option -$OPTARG requires an argument."
+			exit 1;;
+	esac
 done
 
 # Mandatory args
@@ -77,7 +81,7 @@ if [ -z "$FILE" ]; then
 fi
 
 if [ ! -f $FILE ]; then
-    echo "Error: file not found at '$FILE'"
+	echo "Error: file not found at '$FILE'"
 	exit 1
 fi
 
@@ -89,7 +93,7 @@ fi
 # Optional args
 if [ -z "$CERT" ]; then
 	certs=`security find-identity -v -p codesigning`
-	regex="iPhone Developer: ([A-Z a-z])+ \([A-Z0-9]+\)" 
+	regex="iPhone Developer: ([A-Z a-z])+ \([A-Z0-9]+\)"
 	if [[ $certs =~ $regex ]]; then
 		CERT=${BASH_REMATCH}
 		echo "Found iPhone Developer Certificate \"$CERT\""
@@ -103,20 +107,28 @@ WORK_DIR=`dirname $FILE`
 
 cd $WORK_DIR
 
-# Clean up working files...
-if [ $IS_GARBAGE_COLLECTED == true ]; then
+function extract {
+	echo "Unzipping $FILE to $WORK_DIR"
+	unzip -qo $FILE -d $WORK_DIR
+}
+
+# Clear working directory unless Payload reused
+if [ $IS_PAYLOAD_REUSED == false ]; then
 	if [ -d "$PAYLOAD_DIR" ]; then
-		echo "Cleaning up previous working directory..."
+		echo "Clearing '$PAYLOAD_DIR' working directory..."
 		rm -rf "$PAYLOAD_DIR/"
 	fi
 fi
 
-echo "Unzipping $FILE to $WORK_DIR"
-unzip -qo $FILE -d $WORK_DIR
+# Extract *.ipa to Payload directory
+if [ ! -d "$PAYLOAD_DIR" ]; then
+	echo "Unzipping $FILE to $WORK_DIR"
+	unzip -qo $FILE -d $WORK_DIR
+fi
 
 cd $WORK_DIR/$PAYLOAD_DIR
 
-# Get app name inside Payload 
+# Get app name inside Payload
 APP=`ls | grep \.app`
 APPNAME=${APP%.*}
 echo "Found app '$APPNAME'"
@@ -131,7 +143,18 @@ echo "App ID: $APP_ID"
 echo "Deleting existing code signature"
 rm -rf "$CODESIGN_DIR/"
 
-# TODO: Option to replace 'embedded.mobileprovision'
+# Option to replace 'embedded.mobileprovision'
+if [ ! -z "$PROVISION_PROFILE" ]; then
+	if [[ -f $PROVISION_PROFILE ]]; then
+		echo "Replacing '$EMBEDDED_PROVISION' with provising profile: $PROVISION_PROFILE"
+		rm "$EMBEDDED_PROVISION"
+		cp -v "$PROVISION_PROFILE" "$EMBEDDED_PROVISION"
+	else
+		echo "Error: *.mobileprovision profile not found at '$PROVISION_PROFILE'"
+	fi
+else
+	echo "Using embedded mobile provision profile";
+fi
 
 # Delete bundle
 if [ ! -z "$REMOVE_DIR" ]; then
@@ -155,8 +178,14 @@ fi
 
 # Update entitlements
 if [ $IS_DEBUG == true ]; then
-	echo "Adding 'get-task-allow' to entitlements to support debugging"
-	/usr/libexec/plistbuddy -c "Add :get-task-allow bool true" $ENTITLEMENTS	
+	GET_TASK_ALLOW=`/usr/libexec/plistbuddy -c "Print :get-task-allow" $ENTITLEMENTS`
+	if [ "$GET_TASK_ALLOW" == 'false' ] || [ "$GET_TASK_ALLOW" == 'true' ]; then
+		echo "Updating 'get-task-allow' to entitlements to support debugging"
+		/usr/libexec/plistbuddy -c "Set :get-task-allow true" $ENTITLEMENTS
+	else
+		echo "Adding 'get-task-allow' entry to entitlements to support debugging"
+		/usr/libexec/plistbuddy -c "Add :get-task-allow bool true" $ENTITLEMENTS
+	fi
 fi
 
 # Re-codesign
@@ -173,10 +202,10 @@ echo "Time taken: $(($END_TIME - $START_TIME)) seconds"
 
 # Repackage and install app
 if [ $IS_IPA == true ]; then
-	echo "Repackage and install as *.ipa"
+	echo "Repackage as '$APPNAME-$SUFFIX.ipa'"
 	/usr/bin/xcrun -sdk iphoneos PackageApplication $WORK_DIR/$PAYLOAD_DIR/$APP -o $WORK_DIR/$APPNAME-$SUFFIX.ipa
 	if [ $IS_DEBUG == true ]; then
-		echo "Debug mode (NB: must have mobileprovision and entitlements to allow debugging)"
+		echo "Debug mode (Note: entitlements and mobileprovision should allow debugging)"
 		ideviceinstaller --debug --install $WORK_DIR/$APPNAME-$SUFFIX.ipa
 	else
 		ideviceinstaller --install $WORK_DIR/$APPNAME-$SUFFIX.ipa
@@ -188,6 +217,7 @@ if [ $IS_IPA == true ]; then
 			IDEVICE_APP=`ideviceinstaller -l -o xml | grep -A1 '<key>Path</key>' | grep '<string>' | tr '<>' '  ' | awk '{ print $2 }' | grep $APPNAME`
 			echo "Running app on device: $IDEVICE_APP\n"
 			idevice-app-runner --run $IDEVICE_APP
+			exit
 		else
 			echo "To launch app automatically on device please install 'idevice-app-runner' and add it to your PATH."
 		fi
@@ -197,11 +227,13 @@ if [ $IS_IPA == true ]; then
 else
 	echo "Deploying as *.app (type 'exit' to finish lldb session)"
 	if [ $IS_DEBUG == true ]; then
-		echo "Debug mode (NB: must have mobileprovision and entitlements to allow debugging)"
+		echo "Debug mode (Note: entitlements and mobileprovision should allow debugging)"
 		ios-deploy --debug --bundle $WORK_DIR/$PAYLOAD_DIR/$APP
+		exit
 	else
 		ios-deploy --bundle $WORK_DIR/$PAYLOAD_DIR/$APP
+		exit
 	fi
 fi
 
-echo "Done"
+echo "Deploy Complete"
