@@ -10,7 +10,7 @@ A time saving script which enables you to use a prebuilt \*.ipa archive and repa
 ## Options
 
 params | arg | description
--- | -- | --
+------ | --- | -----------
 \-f | *path* | path to \*.ipa archive
 \-d | *dir* | dir to delete inside app
 \-p | *dir* | dir to copy in place
@@ -19,7 +19,7 @@ params | arg | description
 \-m | *path* | path to \*.mobileprovision profile
 
 switches | description
--- | --
+-------- | -----------
 \-i | install as \*.ipa (faster install time for an app with many files)
 \-q | no debugging
 \-z | reuse unzipped 'Payload' dir
