@@ -5,7 +5,7 @@ A time saving script which enables you to use a prebuilt \*.ipa archive and repa
 ## Usage examples
 `sh hotwire-ipa.sh -f ~/Desktop/App.ipa -d \"www\" -p ~/Sites/www`
 
-`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -c \"iPhone Developer: Your Name (XXXXXXXXXX)\" -d \"www\" -p ~/Sites/www -i`
+`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -c \"iPhone Developer: Your Name (XXXXXXXXXX)\" -d \"www\" -p ~/Sites/www -b ~/Cordova/app/platforms/ios/www -i`
 
 ## Options
 
@@ -14,6 +14,7 @@ params | arg | description
 \-f | *path* | path to \*.ipa archive
 \-d | *dir* | dir to delete inside app
 \-p | *dir* | dir to copy in place
+\-b | *dir* | dir to copy cordova build plugins and javascripts
 \-c | *string* | valid certificate code sign identity
 \-m | *path* | path to \*.mobileprovision profile
 
