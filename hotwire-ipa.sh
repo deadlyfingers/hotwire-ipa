@@ -13,6 +13,7 @@ FILE=
 # Optional user params
 REMOVE_DIR=
 REPLACE_DIR=
+CORDOVA_DIR=
 IS_IPA=false
 IS_DEBUG=true
 PROVISION_PROFILE=
@@ -30,7 +31,6 @@ EMBEDDED_PROVISION="embedded.mobileprovision"
 
 # OS options
 IS_PAYLOAD_REUSED=false
-WORK_DIR=
 
 # Script presets
 SUFFIX="hotwired"
@@ -40,6 +40,7 @@ function usage {
 	printf "	-f <path>		path to *.ipa archive\n"
 	printf "	-d <dir>		dir to delete inside app\n"
 	printf "	-p <dir>		dir to copy in place\n"
+	printf "	-b <dir>		dir to copy cordova build plugins and javascripts\n"
 	printf "	-c <string>		valid certificate code sign identity\n"
 	printf "	-m <path>		path to *.mobileprovision profile\n"
 	printf "	-i			install as *.ipa (faster install time for an app with many files)\n"
@@ -55,17 +56,18 @@ fi
 
 START_TIME=$(date +"%s")
 
-while getopts "f:d:p:c:m:iqz" opt; do
+while getopts "f:d:p:b:c:m:iqz" opt; do
 	case "$opt" in
 		f)	FILE=$OPTARG;;
-    d)	REMOVE_DIR=$OPTARG;;
-    p)	REPLACE_DIR=$OPTARG;;
+		d)	REMOVE_DIR=$OPTARG;;
+		p)	REPLACE_DIR=$OPTARG;;
+		b)	CORDOVA_DIR=$OPTARG;;
 		c)	CERT=$OPTARG;;
 		m)	PROVISION_PROFILE=$OPTARG;;
-    i)	IS_IPA=true;;
-    q)	IS_DEBUG=false;;
-    z)	IS_PAYLOAD_REUSED=true;;
-    ?)
+		i)	IS_IPA=true;;
+		q)	IS_DEBUG=false;;
+		z)	IS_PAYLOAD_REUSED=true;;
+		?)
 			usage
 			exit 1;;
 		:)
@@ -169,10 +171,22 @@ fi
 # Replace bundle
 if [ ! -z "$REPLACE_DIR" ]; then
 	if [ -d "$REPLACE_DIR" ]; then
-	  	echo "Copying '$REPLACE_DIR' dir into $PAYLOAD_DIR/$APP/$REMOVE_DIR"
+	  echo "Copying '$REPLACE_DIR' dir into $PAYLOAD_DIR/$APP/$REMOVE_DIR"
 		cp -R $REPLACE_DIR $WORK_DIR/$PAYLOAD_DIR/$APP/$REMOVE_DIR
 	else
 		echo "Error: can't find '$REPLACE_DIR' directory to copy"
+	fi
+fi
+
+# Copy Corodova build dir
+if [ ! -z "$CORDOVA_DIR" ]; then
+	if [ -d "$CORDOVA_DIR" ]; then
+		echo "Copying cordova build components from dir '$CORDOVA_DIR' into $PAYLOAD_DIR/$APP/$REMOVE_DIR"
+		cp -vr $CORDOVA_DIR/plugins $WORK_DIR/$PAYLOAD_DIR/$APP/$REMOVE_DIR/plugins
+		cp -v $CORDOVA_DIR/cordova_plugins.js $WORK_DIR/$PAYLOAD_DIR/$APP/$REMOVE_DIR
+		cp -v $CORDOVA_DIR/cordova.js $WORK_DIR/$PAYLOAD_DIR/$APP/$REMOVE_DIR
+	else
+		echo "Error: can't find '$CORDOVA_DIR' cordova build directory to copy"
 	fi
 fi
 
