@@ -3,9 +3,9 @@
 A time saving script which enables you to use a prebuilt \*.ipa archive and repackage it with new files to test quicker on device.
 
 ## Usage examples
-`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -d \"www\" -p ~/Sites/www`
+`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -d "www" -p ~/Sites/www`
 
-`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -c \"iPhone Developer: Your Name (XXXXXXXXXX)\" -d \"www\" -p ~/Sites/www -b ~/Cordova/app/platforms/ios/www -i`
+`sh hotwire-ipa.sh -f ~/Desktop/App.ipa -c "iPhone Developer: Your Name (XXXXXXXXXX)" -d "www" -p ~/Sites/www -b ~/Cordova/app/platforms/ios/www -i`
 
 ## Options
 
