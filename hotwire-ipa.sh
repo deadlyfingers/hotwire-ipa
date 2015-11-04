@@ -5,7 +5,7 @@
 
 # Check dependancies
 command -v ios-deploy >/dev/null 2>&1 || { echo >&2 "Script requires 'ios-deploy'. Please install Node.js and run: \nnpm install -g ios-deploy"; exit 1; }
-command -v ios-deploy >/dev/null 2>&1 || { echo >&2 "Script requires 'ideviceinstaller'. Please install Homebrew and run: \nbrew install ideviceinstaller"; exit 1; }
+command -v ideviceinstaller >/dev/null 2>&1 || { echo >&2 "Script requires 'ideviceinstaller'. Please install Homebrew and run: \nbrew install ideviceinstaller"; exit 1; }
 
 # Mandatory user params
 FILE=
@@ -108,11 +108,6 @@ fi
 WORK_DIR=`dirname $FILE`
 
 cd $WORK_DIR
-
-function extract {
-	echo "Unzipping $FILE to $WORK_DIR"
-	unzip -qo $FILE -d $WORK_DIR
-}
 
 # Clear working directory unless Payload reused
 if [ $IS_PAYLOAD_REUSED == false ]; then
